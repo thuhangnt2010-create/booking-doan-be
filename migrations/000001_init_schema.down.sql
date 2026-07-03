@@ -1,0 +1,13 @@
+DROP TABLE IF EXISTS admin_users;
+DROP TABLE IF EXISTS payment_requests;
+DROP TABLE IF EXISTS staff_call_requests;
+DROP TABLE IF EXISTS order_items;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS menu_item_options;
+DROP TABLE IF EXISTS menu_items;
+DROP TABLE IF EXISTS menu_categories;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS qr_codes;
+DROP TABLE IF EXISTS tables;
+DROP TABLE IF EXISTS branches;
+DROP TABLE IF EXISTS restaurants;
