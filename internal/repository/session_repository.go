@@ -50,6 +50,16 @@ func (r *SessionRepository) FindByID(ctx context.Context, id string) (*models.Se
 	return &s, nil
 }
 
+func (r *SessionRepository) SetStatus(ctx context.Context, id, status string) error {
+	_, err := r.DB.Exec(ctx, `UPDATE sessions SET status = $1 WHERE id = $2`, status, id)
+	return err
+}
+
+func (r *SessionRepository) Close(ctx context.Context, id string) error {
+	_, err := r.DB.Exec(ctx, `UPDATE sessions SET status = 'closed', ended_at = NOW() WHERE id = $1`, id)
+	return err
+}
+
 func (r *SessionRepository) Create(ctx context.Context, tableID string) (*models.Session, error) {
 	row := r.DB.QueryRow(ctx, `
 		INSERT INTO sessions (table_id, status)

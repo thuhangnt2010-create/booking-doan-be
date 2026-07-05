@@ -71,15 +71,16 @@ type MenuItemOption struct {
 }
 
 type Order struct {
-	ID              string      `json:"id"`
-	SessionID       string      `json:"sessionId"`
-	Code            string      `json:"code"`
-	Status          string      `json:"status"`
-	Subtotal        string      `json:"subtotal"`
-	VATAmount       string      `json:"vatAmount"`
-	Total           string      `json:"total"`
-	CreatedAt       time.Time   `json:"createdAt"`
-	Items           []OrderItem `json:"items"`
+	ID          string      `json:"id"`
+	SessionID   string      `json:"sessionId"`
+	Code        string      `json:"code"`
+	SequenceNo  int         `json:"sequenceNo"`
+	Status      string      `json:"status"`
+	Subtotal    string      `json:"subtotal"`
+	VATAmount   string      `json:"vatAmount"`
+	Total       string      `json:"total"`
+	CreatedAt   time.Time   `json:"createdAt"`
+	Items       []OrderItem `json:"items"`
 }
 
 type OrderItem struct {

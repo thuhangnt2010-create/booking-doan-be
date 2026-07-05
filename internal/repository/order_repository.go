@@ -35,16 +35,24 @@ func (r *OrderRepository) Create(ctx context.Context, sessionID, code, clientReq
 	}
 	defer tx.Rollback(ctx)
 
+	if _, err := tx.Exec(ctx, `SELECT id FROM sessions WHERE id = $1 FOR UPDATE`, sessionID); err != nil {
+		return nil, err
+	}
+	var sequenceNo int
+	if err := tx.QueryRow(ctx, `SELECT COUNT(*) + 1 FROM orders WHERE session_id = $1`, sessionID).Scan(&sequenceNo); err != nil {
+		return nil, err
+	}
+
 	var orderID string
 	var reqID any = clientRequestID
 	if clientRequestID == "" {
 		reqID = nil
 	}
 	row := tx.QueryRow(ctx, `
-		INSERT INTO orders (session_id, code, status, subtotal, vat_amount, total, client_request_id)
-		VALUES ($1, $2, 'sent', $3, $4, $5, $6)
+		INSERT INTO orders (session_id, code, sequence_no, status, subtotal, vat_amount, total, client_request_id)
+		VALUES ($1, $2, $3, 'sent', $4, $5, $6, $7)
 		RETURNING id
-	`, sessionID, code, subtotal, vat, total, reqID)
+	`, sessionID, code, sequenceNo, subtotal, vat, total, reqID)
 	if err := row.Scan(&orderID); err != nil {
 		return nil, err
 	}
@@ -79,12 +87,12 @@ func (r *OrderRepository) Create(ctx context.Context, sessionID, code, clientReq
 
 func (r *OrderRepository) getFullOrder(ctx context.Context, orderID string) (*models.Order, error) {
 	row := r.DB.QueryRow(ctx, `
-		SELECT id, session_id, code, status, subtotal::text, vat_amount::text, total::text, created_at
+		SELECT id, session_id, code, sequence_no, status, subtotal::text, vat_amount::text, total::text, created_at
 		FROM orders WHERE id = $1
 	`, orderID)
 
 	var o models.Order
-	if err := row.Scan(&o.ID, &o.SessionID, &o.Code, &o.Status, &o.Subtotal, &o.VATAmount, &o.Total, &o.CreatedAt); err != nil {
+	if err := row.Scan(&o.ID, &o.SessionID, &o.Code, &o.SequenceNo, &o.Status, &o.Subtotal, &o.VATAmount, &o.Total, &o.CreatedAt); err != nil {
 		if err == pgx.ErrNoRows {
 			return nil, ErrNotFound
 		}

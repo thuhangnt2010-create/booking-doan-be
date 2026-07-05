@@ -1,0 +1,1 @@
+ALTER TABLE orders ADD COLUMN sequence_no INT NOT NULL DEFAULT 1;

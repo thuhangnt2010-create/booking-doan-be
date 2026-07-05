@@ -51,6 +51,15 @@ func main() {
 	}
 	orderHandler := &handlers.OrderHandler{Service: orderService, OrderRepo: orderRepo}
 
+	staffCallRepo := &repository.StaffCallRepository{DB: pgPool}
+	staffCallService := &service.StaffCallService{Session: sessionRepo, Table: tableRepo, StaffCall: staffCallRepo, Hub: hub}
+	staffCallHandler := &handlers.StaffCallHandler{Service: staffCallService, Repo: staffCallRepo}
+
+	paymentRepo := &repository.PaymentRepository{DB: pgPool}
+	paymentService := &service.PaymentService{Session: sessionRepo, Table: tableRepo, Order: orderRepo, Payment: paymentRepo, Hub: hub}
+	paymentHandler := &handlers.PaymentHandler{Service: paymentService}
+	sessionExtraHandler := &handlers.SessionExtraHandler{Service: paymentService}
+
 	mux := http.NewServeMux()
 	mux.Handle("/health", &handlers.HealthHandler{DB: pgPool, Redis: redisClient})
 	mux.Handle("/qr/", &handlers.QRHandler{Service: qrSessionService})
@@ -63,6 +72,15 @@ func main() {
 	mux.HandleFunc("/order-items/", orderHandler.ItemSubRoute)
 	mux.Handle("/ws/orders/branch/", &handlers.OrderBranchWSHandler{Hub: hub})
 	mux.Handle("/ws/orders/session/", &handlers.OrderSessionWSHandler{Hub: hub})
+	mux.HandleFunc("/staff-calls", staffCallHandler.Root)
+	mux.HandleFunc("/staff-calls/", staffCallHandler.SubRoute)
+	mux.Handle("/ws/staff-calls/branch/", &handlers.StaffCallBranchWSHandler{Hub: hub})
+	mux.Handle("/ws/staff-calls/session/", &handlers.StaffCallSessionWSHandler{Hub: hub})
+	mux.HandleFunc("/payment-requests", paymentHandler.Create)
+	mux.HandleFunc("/payment-requests/", paymentHandler.SubRoute)
+	mux.HandleFunc("/sessions/", sessionExtraHandler.SubRoute)
+	mux.Handle("/ws/payments/branch/", &handlers.PaymentBranchWSHandler{Hub: hub})
+	mux.Handle("/ws/payments/session/", &handlers.PaymentSessionWSHandler{Hub: hub})
 
 	log.Printf("booking-doan-be listening on :%s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, mux); err != nil {
