@@ -32,6 +32,24 @@ func (r *SessionRepository) FindActiveByTable(ctx context.Context, tableID strin
 	return &s, nil
 }
 
+func (r *SessionRepository) FindByID(ctx context.Context, id string) (*models.Session, error) {
+	row := r.DB.QueryRow(ctx, `
+		SELECT id, table_id, status, started_at, ended_at
+		FROM sessions
+		WHERE id = $1
+	`, id)
+
+	var s models.Session
+	err := row.Scan(&s.ID, &s.TableID, &s.Status, &s.StartedAt, &s.EndedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return &s, nil
+}
+
 func (r *SessionRepository) Create(ctx context.Context, tableID string) (*models.Session, error) {
 	row := r.DB.QueryRow(ctx, `
 		INSERT INTO sessions (table_id, status)

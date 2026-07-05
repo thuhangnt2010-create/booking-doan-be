@@ -69,3 +69,34 @@ type MenuItemOption struct {
 	Name       string `json:"name"`
 	PriceDelta string `json:"priceDelta"`
 }
+
+type Order struct {
+	ID              string      `json:"id"`
+	SessionID       string      `json:"sessionId"`
+	Code            string      `json:"code"`
+	Status          string      `json:"status"`
+	Subtotal        string      `json:"subtotal"`
+	VATAmount       string      `json:"vatAmount"`
+	Total           string      `json:"total"`
+	CreatedAt       time.Time   `json:"createdAt"`
+	Items           []OrderItem `json:"items"`
+}
+
+type OrderItem struct {
+	ID        string              `json:"id"`
+	OrderID   string              `json:"orderId"`
+	ItemID    string              `json:"itemId"`
+	ItemName  string              `json:"itemName"`
+	Qty       int                 `json:"qty"`
+	UnitPrice string              `json:"unitPrice"`
+	Note      string              `json:"note"`
+	Status    string              `json:"status"`
+	Options   []OrderItemOption   `json:"options"`
+}
+
+type OrderItemOption struct {
+	ID          string `json:"id"`
+	OrderItemID string `json:"orderItemId"`
+	Name        string `json:"name"`
+	PriceDelta  string `json:"priceDelta"`
+}

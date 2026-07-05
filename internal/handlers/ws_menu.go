@@ -23,17 +23,5 @@ func (h *MenuWSHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		return
-	}
-
-	topic := "menu:" + branchID
-	client := h.Hub.Register(topic, conn)
-	defer func() {
-		h.Hub.Unregister(topic, client)
-		conn.Close()
-	}()
-
-	client.ReadLoop()
+	serveWS(w, r, h.Hub, "menu:"+branchID)
 }

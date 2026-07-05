@@ -36,8 +36,20 @@ func main() {
 	}
 
 	menuRepo := &repository.MenuRepository{DB: pgPool}
+	sessionRepo := &repository.SessionRepository{DB: pgPool}
+	tableRepo := &repository.TableRepository{DB: pgPool}
+	orderRepo := &repository.OrderRepository{DB: pgPool}
 	hub := realtime.NewHub()
 	menuHandler := &handlers.MenuHandler{Repo: menuRepo}
+
+	orderService := &service.OrderService{
+		Session: sessionRepo,
+		Table:   tableRepo,
+		Menu:    menuRepo,
+		Order:   orderRepo,
+		Hub:     hub,
+	}
+	orderHandler := &handlers.OrderHandler{Service: orderService, OrderRepo: orderRepo}
 
 	mux := http.NewServeMux()
 	mux.Handle("/health", &handlers.HealthHandler{DB: pgPool, Redis: redisClient})
@@ -46,6 +58,11 @@ func main() {
 	mux.HandleFunc("/menu-items/", menuHandler.Detail)
 	mux.Handle("/ws/menu/", &handlers.MenuWSHandler{Hub: hub})
 	mux.HandleFunc("/admin/menu-items/", (&handlers.AdminMenuHandler{Repo: menuRepo, Hub: hub}).Update)
+	mux.HandleFunc("/orders", orderHandler.Root)
+	mux.HandleFunc("/orders/", orderHandler.SubRoute)
+	mux.HandleFunc("/order-items/", orderHandler.ItemSubRoute)
+	mux.Handle("/ws/orders/branch/", &handlers.OrderBranchWSHandler{Hub: hub})
+	mux.Handle("/ws/orders/session/", &handlers.OrderSessionWSHandler{Hub: hub})
 
 	log.Printf("booking-doan-be listening on :%s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, mux); err != nil {
