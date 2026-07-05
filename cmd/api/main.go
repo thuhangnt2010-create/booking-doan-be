@@ -8,6 +8,8 @@ import (
 	"github.com/thuhangnt2010-create/booking-doan-be/internal/config"
 	"github.com/thuhangnt2010-create/booking-doan-be/internal/db"
 	"github.com/thuhangnt2010-create/booking-doan-be/internal/handlers"
+	"github.com/thuhangnt2010-create/booking-doan-be/internal/repository"
+	"github.com/thuhangnt2010-create/booking-doan-be/internal/service"
 )
 
 func main() {
@@ -26,8 +28,15 @@ func main() {
 	}
 	defer redisClient.Close()
 
+	qrSessionService := &service.QRSessionService{
+		QR:      &repository.QRRepository{DB: pgPool},
+		Session: &repository.SessionRepository{DB: pgPool},
+		Table:   &repository.TableRepository{DB: pgPool},
+	}
+
 	mux := http.NewServeMux()
 	mux.Handle("/health", &handlers.HealthHandler{DB: pgPool, Redis: redisClient})
+	mux.Handle("/qr/", &handlers.QRHandler{Service: qrSessionService})
 
 	log.Printf("booking-doan-be listening on :%s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, mux); err != nil {
