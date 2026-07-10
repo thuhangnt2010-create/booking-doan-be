@@ -71,13 +71,21 @@ func (h *OrderHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *OrderHandler) List(w http.ResponseWriter, r *http.Request) {
-	sessionID := r.URL.Query().Get("sessionId")
-	if sessionID == "" {
-		writeError(w, http.StatusBadRequest, "MISSING_SESSION_ID", "Thiếu sessionId")
+	q := r.URL.Query()
+	branchID := q.Get("branchId")
+	sessionID := q.Get("sessionId")
+	if branchID == "" && sessionID == "" {
+		writeError(w, http.StatusBadRequest, "MISSING_QUERY", "Thiếu branchId hoặc sessionId")
 		return
 	}
 
-	orders, err := h.OrderRepo.ListBySession(r.Context(), sessionID)
+	var orders []models.Order
+	var err error
+	if branchID != "" {
+		orders, err = h.OrderRepo.ListByBranch(r.Context(), branchID)
+	} else {
+		orders, err = h.OrderRepo.ListBySession(r.Context(), sessionID)
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Lỗi hệ thống")
 		return

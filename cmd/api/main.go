@@ -57,7 +57,7 @@ func main() {
 
 	paymentRepo := &repository.PaymentRepository{DB: pgPool}
 	paymentService := &service.PaymentService{Session: sessionRepo, Table: tableRepo, Order: orderRepo, Payment: paymentRepo, Hub: hub}
-	paymentHandler := &handlers.PaymentHandler{Service: paymentService}
+	paymentHandler := &handlers.PaymentHandler{Service: paymentService, Repo: paymentRepo}
 	sessionExtraHandler := &handlers.SessionExtraHandler{Service: paymentService}
 
 	mux := http.NewServeMux()
@@ -76,7 +76,7 @@ func main() {
 	mux.HandleFunc("/staff-calls/", staffCallHandler.SubRoute)
 	mux.Handle("/ws/staff-calls/branch/", &handlers.StaffCallBranchWSHandler{Hub: hub})
 	mux.Handle("/ws/staff-calls/session/", &handlers.StaffCallSessionWSHandler{Hub: hub})
-	mux.HandleFunc("/payment-requests", paymentHandler.Create)
+	mux.HandleFunc("/payment-requests", paymentHandler.Root)
 	mux.HandleFunc("/payment-requests/", paymentHandler.SubRoute)
 	mux.HandleFunc("/sessions/", sessionExtraHandler.SubRoute)
 	mux.Handle("/ws/payments/branch/", &handlers.PaymentBranchWSHandler{Hub: hub})

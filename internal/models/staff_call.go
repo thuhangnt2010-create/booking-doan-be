@@ -8,4 +8,6 @@ type StaffCallRequest struct {
 	Type      string    `json:"type"`
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"createdAt"`
+	TableCode string    `json:"tableCode,omitempty"`
+	TableArea string    `json:"tableArea,omitempty"`
 }

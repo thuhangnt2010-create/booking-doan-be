@@ -185,6 +185,46 @@ func (r *OrderRepository) UpdateItemStatus(ctx context.Context, orderItemID, sta
 	return orderID, nil
 }
 
+func (r *OrderRepository) ListByBranch(ctx context.Context, branchID string) ([]models.Order, error) {
+	rows, err := r.DB.Query(ctx, `
+		SELECT o.id, t.code, t.area
+		FROM orders o
+		JOIN sessions s ON s.id = o.session_id
+		JOIN tables t ON t.id = s.table_id
+		WHERE t.branch_id = $1 AND o.status NOT IN ('served', 'cancelled')
+		ORDER BY o.created_at ASC
+	`, branchID)
+	if err != nil {
+		return nil, err
+	}
+	type row struct{ id, code, area string }
+	var list []row
+	for rows.Next() {
+		var rr row
+		if err := rows.Scan(&rr.id, &rr.code, &rr.area); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		list = append(list, rr)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	var orders []models.Order
+	for _, rr := range list {
+		o, err := r.getFullOrder(ctx, rr.id)
+		if err != nil {
+			return nil, fmt.Errorf("load order %s: %w", rr.id, err)
+		}
+		o.TableCode = rr.code
+		o.TableArea = rr.area
+		orders = append(orders, *o)
+	}
+	return orders, nil
+}
+
 func (r *OrderRepository) ListBySession(ctx context.Context, sessionID string) ([]models.Order, error) {
 	rows, err := r.DB.Query(ctx, `SELECT id FROM orders WHERE session_id = $1 ORDER BY created_at ASC`, sessionID)
 	if err != nil {

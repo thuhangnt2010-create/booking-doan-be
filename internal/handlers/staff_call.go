@@ -62,12 +62,21 @@ func (h *StaffCallHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *StaffCallHandler) List(w http.ResponseWriter, r *http.Request) {
-	sessionID := r.URL.Query().Get("sessionId")
-	if sessionID == "" {
-		writeError(w, http.StatusBadRequest, "MISSING_SESSION_ID", "Thiếu sessionId")
+	q := r.URL.Query()
+	branchID := q.Get("branchId")
+	sessionID := q.Get("sessionId")
+	if branchID == "" && sessionID == "" {
+		writeError(w, http.StatusBadRequest, "MISSING_QUERY", "Thiếu branchId hoặc sessionId")
 		return
 	}
-	calls, err := h.Repo.ListBySession(r.Context(), sessionID)
+
+	var calls []models.StaffCallRequest
+	var err error
+	if branchID != "" {
+		calls, err = h.Repo.ListByBranch(r.Context(), branchID)
+	} else {
+		calls, err = h.Repo.ListBySession(r.Context(), sessionID)
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Lỗi hệ thống")
 		return

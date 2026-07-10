@@ -6,23 +6,50 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/thuhangnt2010-create/booking-doan-be/internal/models"
+	"github.com/thuhangnt2010-create/booking-doan-be/internal/repository"
 	"github.com/thuhangnt2010-create/booking-doan-be/internal/service"
 )
 
 type PaymentHandler struct {
 	Service *service.PaymentService
+	Repo    *repository.PaymentRepository
 }
 
 type createPaymentRequestBody struct {
 	SessionID string `json:"sessionId"`
 }
 
-func (h *PaymentHandler) Create(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
+func (h *PaymentHandler) Root(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		h.Create(w, r)
+	case http.MethodGet:
+		h.List(w, r)
+	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+func (h *PaymentHandler) List(w http.ResponseWriter, r *http.Request) {
+	branchID := r.URL.Query().Get("branchId")
+	if branchID == "" {
+		writeError(w, http.StatusBadRequest, "MISSING_BRANCH_ID", "Thiếu branchId")
 		return
 	}
+	requests, err := h.Repo.ListByBranch(r.Context(), branchID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Lỗi hệ thống")
+		return
+	}
+	if requests == nil {
+		requests = []models.PaymentRequest{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"paymentRequests": requests})
+}
 
+func (h *PaymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var body createPaymentRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "INVALID_BODY", "Body không hợp lệ")

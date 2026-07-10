@@ -60,3 +60,28 @@ func (r *StaffCallRepository) ListBySession(ctx context.Context, sessionID strin
 	}
 	return calls, rows.Err()
 }
+
+func (r *StaffCallRepository) ListByBranch(ctx context.Context, branchID string) ([]models.StaffCallRequest, error) {
+	rows, err := r.DB.Query(ctx, `
+		SELECT c.id, c.session_id, c.type, c.status, c.created_at, t.code, t.area
+		FROM staff_call_requests c
+		JOIN sessions s ON s.id = c.session_id
+		JOIN tables t ON t.id = s.table_id
+		WHERE t.branch_id = $1 AND c.status != 'done'
+		ORDER BY c.created_at ASC
+	`, branchID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var calls []models.StaffCallRequest
+	for rows.Next() {
+		var c models.StaffCallRequest
+		if err := rows.Scan(&c.ID, &c.SessionID, &c.Type, &c.Status, &c.CreatedAt, &c.TableCode, &c.TableArea); err != nil {
+			return nil, err
+		}
+		calls = append(calls, c)
+	}
+	return calls, rows.Err()
+}

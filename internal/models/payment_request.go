@@ -8,6 +8,8 @@ type PaymentRequest struct {
 	Status      string     `json:"status"`
 	RequestedAt time.Time  `json:"requestedAt"`
 	ConfirmedAt *time.Time `json:"confirmedAt,omitempty"`
+	TableCode   string     `json:"tableCode,omitempty"`
+	TableArea   string     `json:"tableArea,omitempty"`
 }
 
 type Bill struct {
