@@ -60,6 +60,10 @@ func main() {
 	paymentHandler := &handlers.PaymentHandler{Service: paymentService, Repo: paymentRepo}
 	sessionExtraHandler := &handlers.SessionExtraHandler{Service: paymentService}
 
+	qrRepo := &repository.QRRepository{DB: pgPool}
+	adminTableHandler := &handlers.AdminTableHandler{TableRepo: tableRepo, QRRepo: qrRepo, PublicUserURL: cfg.PublicUserURL}
+	qrImageHandler := &handlers.QRImageHandler{PublicUserURL: cfg.PublicUserURL}
+
 	mux := http.NewServeMux()
 	mux.Handle("/health", &handlers.HealthHandler{DB: pgPool, Redis: redisClient})
 	mux.Handle("/qr/", &handlers.QRHandler{Service: qrSessionService})
@@ -81,6 +85,9 @@ func main() {
 	mux.HandleFunc("/sessions/", sessionExtraHandler.SubRoute)
 	mux.Handle("/ws/payments/branch/", &handlers.PaymentBranchWSHandler{Hub: hub})
 	mux.Handle("/ws/payments/session/", &handlers.PaymentSessionWSHandler{Hub: hub})
+	mux.HandleFunc("/admin/tables", adminTableHandler.Root)
+	mux.HandleFunc("/admin/tables/", adminTableHandler.SubRoute)
+	mux.Handle("/admin/qr-images/", qrImageHandler)
 
 	log.Printf("booking-doan-be listening on :%s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, mux); err != nil {

@@ -22,6 +22,19 @@ type Table struct {
 	Status   string `json:"status"`
 }
 
+type QRCode struct {
+	ID        string    `json:"id"`
+	TableID   string    `json:"tableId"`
+	Token     string    `json:"token"`
+	Active    bool      `json:"active"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+type TableWithQR struct {
+	Table
+	ActiveQRToken string `json:"activeQrToken,omitempty"`
+}
+
 type Session struct {
 	ID        string     `json:"id"`
 	TableID   string     `json:"tableId"`

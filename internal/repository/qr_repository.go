@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -43,4 +45,54 @@ func (r *QRRepository) FindActiveByToken(ctx context.Context, token string) (*Re
 		return nil, err
 	}
 	return &res, nil
+}
+
+func (r *QRRepository) CreateForTable(ctx context.Context, tableID string) (*models.QRCode, error) {
+	tx, err := r.DB.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `UPDATE qr_codes SET active = false WHERE table_id = $1 AND active = true`, tableID); err != nil {
+		return nil, err
+	}
+
+	token := generateQRToken()
+	row := tx.QueryRow(ctx, `
+		INSERT INTO qr_codes (table_id, token, active)
+		VALUES ($1, $2, true)
+		RETURNING id, table_id, token, active, created_at
+	`, tableID, token)
+
+	var q models.QRCode
+	if err := row.Scan(&q.ID, &q.TableID, &q.Token, &q.Active, &q.CreatedAt); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return &q, nil
+}
+
+func (r *QRRepository) GetActiveByTable(ctx context.Context, tableID string) (*models.QRCode, error) {
+	row := r.DB.QueryRow(ctx, `
+		SELECT id, table_id, token, active, created_at
+		FROM qr_codes WHERE table_id = $1 AND active = true
+	`, tableID)
+	var q models.QRCode
+	if err := row.Scan(&q.ID, &q.TableID, &q.Token, &q.Active, &q.CreatedAt); err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return &q, nil
+}
+
+func generateQRToken() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }
