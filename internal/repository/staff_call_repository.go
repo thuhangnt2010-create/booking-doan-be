@@ -67,7 +67,7 @@ func (r *StaffCallRepository) ListByBranch(ctx context.Context, branchID string)
 		FROM staff_call_requests c
 		JOIN sessions s ON s.id = c.session_id
 		JOIN tables t ON t.id = s.table_id
-		WHERE t.branch_id = $1 AND c.status != 'done'
+		WHERE t.branch_id = $1 AND c.status != 'done' AND s.status != 'closed'
 		ORDER BY c.created_at ASC
 	`, branchID)
 	if err != nil {

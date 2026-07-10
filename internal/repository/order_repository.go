@@ -191,7 +191,7 @@ func (r *OrderRepository) ListByBranch(ctx context.Context, branchID string) ([]
 		FROM orders o
 		JOIN sessions s ON s.id = o.session_id
 		JOIN tables t ON t.id = s.table_id
-		WHERE t.branch_id = $1 AND o.status NOT IN ('served', 'cancelled')
+		WHERE t.branch_id = $1 AND o.status NOT IN ('served', 'cancelled') AND s.status != 'closed'
 		ORDER BY o.created_at ASC
 	`, branchID)
 	if err != nil {

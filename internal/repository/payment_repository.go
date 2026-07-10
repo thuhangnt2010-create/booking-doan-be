@@ -48,7 +48,7 @@ func (r *PaymentRepository) ListByBranch(ctx context.Context, branchID string) (
 		FROM payment_requests p
 		JOIN sessions s ON s.id = p.session_id
 		JOIN tables t ON t.id = s.table_id
-		WHERE t.branch_id = $1 AND p.status != 'cancelled'
+		WHERE t.branch_id = $1 AND p.status != 'cancelled' AND s.status != 'closed'
 		ORDER BY p.requested_at ASC
 	`, branchID)
 	if err != nil {
