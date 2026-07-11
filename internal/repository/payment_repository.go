@@ -56,12 +56,13 @@ func (r *PaymentRepository) CountTablesAwaitingPayment(ctx context.Context, bran
 }
 
 // ListByBranch returns payment requests for a branch. When from/to are nil, it
-// returns only currently-pending requests (session not yet closed) — the
-// "needs action now" view. When from/to are provided, it returns historical
-// requests within that requested_at range regardless of session status.
+// returns every request from TODAY (branch-local, Asia/Ho_Chi_Minh) regardless
+// of session status — closing a table only changes its displayed status, it
+// never drops the row out of today's list. When from/to are provided, it
+// returns historical requests within that requested_at range instead.
 func (r *PaymentRepository) ListByBranch(ctx context.Context, branchID string, from, to *time.Time) ([]models.PaymentRequest, error) {
 	query := `
-		SELECT p.id, p.session_id, p.status, p.requested_at, p.confirmed_at, t.code, t.area,
+		SELECT p.id, p.session_id, p.status, p.requested_at, p.confirmed_at, t.code, t.area, s.status,
 			(SELECT MIN(o.created_at) FROM orders o WHERE o.session_id = p.session_id) AS ordered_at,
 			COALESCE((SELECT SUM(o.total) FROM orders o WHERE o.session_id = p.session_id AND o.status != 'cancelled'), 0)::text AS total
 		FROM payment_requests p
@@ -74,7 +75,7 @@ func (r *PaymentRepository) ListByBranch(ctx context.Context, branchID string, f
 		query += ` AND p.requested_at >= $2 AND p.requested_at <= $3`
 		args = append(args, *from, *to)
 	} else {
-		query += ` AND s.status != 'closed'`
+		query += ` AND p.requested_at >= date_trunc('day', now() AT TIME ZONE 'Asia/Ho_Chi_Minh') AT TIME ZONE 'Asia/Ho_Chi_Minh'`
 	}
 	query += ` ORDER BY p.requested_at ASC`
 
@@ -87,7 +88,7 @@ func (r *PaymentRepository) ListByBranch(ctx context.Context, branchID string, f
 	var requests []models.PaymentRequest
 	for rows.Next() {
 		var p models.PaymentRequest
-		if err := rows.Scan(&p.ID, &p.SessionID, &p.Status, &p.RequestedAt, &p.ConfirmedAt, &p.TableCode, &p.TableArea, &p.OrderedAt, &p.Total); err != nil {
+		if err := rows.Scan(&p.ID, &p.SessionID, &p.Status, &p.RequestedAt, &p.ConfirmedAt, &p.TableCode, &p.TableArea, &p.SessionStatus, &p.OrderedAt, &p.Total); err != nil {
 			return nil, err
 		}
 		requests = append(requests, p)
