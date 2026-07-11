@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -54,15 +55,30 @@ func (r *PaymentRepository) CountTablesAwaitingPayment(ctx context.Context, bran
 	return count, err
 }
 
-func (r *PaymentRepository) ListByBranch(ctx context.Context, branchID string) ([]models.PaymentRequest, error) {
-	rows, err := r.DB.Query(ctx, `
-		SELECT p.id, p.session_id, p.status, p.requested_at, p.confirmed_at, t.code, t.area
+// ListByBranch returns payment requests for a branch. When from/to are nil, it
+// returns only currently-pending requests (session not yet closed) — the
+// "needs action now" view. When from/to are provided, it returns historical
+// requests within that requested_at range regardless of session status.
+func (r *PaymentRepository) ListByBranch(ctx context.Context, branchID string, from, to *time.Time) ([]models.PaymentRequest, error) {
+	query := `
+		SELECT p.id, p.session_id, p.status, p.requested_at, p.confirmed_at, t.code, t.area,
+			(SELECT MIN(o.created_at) FROM orders o WHERE o.session_id = p.session_id) AS ordered_at,
+			COALESCE((SELECT SUM(o.total) FROM orders o WHERE o.session_id = p.session_id AND o.status != 'cancelled'), 0)::text AS total
 		FROM payment_requests p
 		JOIN sessions s ON s.id = p.session_id
 		JOIN tables t ON t.id = s.table_id
-		WHERE t.branch_id = $1 AND p.status != 'cancelled' AND s.status != 'closed'
-		ORDER BY p.requested_at ASC
-	`, branchID)
+		WHERE t.branch_id = $1 AND p.status != 'cancelled'
+	`
+	args := []any{branchID}
+	if from != nil && to != nil {
+		query += ` AND p.requested_at >= $2 AND p.requested_at <= $3`
+		args = append(args, *from, *to)
+	} else {
+		query += ` AND s.status != 'closed'`
+	}
+	query += ` ORDER BY p.requested_at ASC`
+
+	rows, err := r.DB.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +87,7 @@ func (r *PaymentRepository) ListByBranch(ctx context.Context, branchID string) (
 	var requests []models.PaymentRequest
 	for rows.Next() {
 		var p models.PaymentRequest
-		if err := rows.Scan(&p.ID, &p.SessionID, &p.Status, &p.RequestedAt, &p.ConfirmedAt, &p.TableCode, &p.TableArea); err != nil {
+		if err := rows.Scan(&p.ID, &p.SessionID, &p.Status, &p.RequestedAt, &p.ConfirmedAt, &p.TableCode, &p.TableArea, &p.OrderedAt, &p.Total); err != nil {
 			return nil, err
 		}
 		requests = append(requests, p)

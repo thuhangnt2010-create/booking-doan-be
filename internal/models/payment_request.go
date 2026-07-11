@@ -10,6 +10,8 @@ type PaymentRequest struct {
 	ConfirmedAt *time.Time `json:"confirmedAt,omitempty"`
 	TableCode   string     `json:"tableCode,omitempty"`
 	TableArea   string     `json:"tableArea,omitempty"`
+	OrderedAt   *time.Time `json:"orderedAt,omitempty"`
+	Total       string     `json:"total"`
 }
 
 type Bill struct {

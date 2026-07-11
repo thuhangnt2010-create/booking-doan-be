@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/thuhangnt2010-create/booking-doan-be/internal/models"
 	"github.com/thuhangnt2010-create/booking-doan-be/internal/repository"
@@ -41,7 +42,33 @@ func (h *PaymentHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "MISSING_BRANCH_ID", "Thiếu branchId")
 		return
 	}
-	requests, err := h.Repo.ListByBranch(r.Context(), branchID)
+
+	var from, to *time.Time
+	fromStr, toStr := r.URL.Query().Get("from"), r.URL.Query().Get("to")
+	if fromStr != "" || toStr != "" {
+		f, err := time.Parse("2006-01-02", fromStr)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "INVALID_FROM", "Ngày bắt đầu không hợp lệ")
+			return
+		}
+		t, err := time.Parse("2006-01-02", toStr)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "INVALID_TO", "Ngày kết thúc không hợp lệ")
+			return
+		}
+		t = t.Add(24*time.Hour - time.Nanosecond)
+		if t.Before(f) {
+			writeError(w, http.StatusBadRequest, "INVALID_RANGE", "Khoảng ngày không hợp lệ")
+			return
+		}
+		if t.Sub(f) > 31*24*time.Hour {
+			writeError(w, http.StatusBadRequest, "RANGE_TOO_WIDE", "Khoảng lọc tối đa 1 tháng")
+			return
+		}
+		from, to = &f, &t
+	}
+
+	requests, err := h.Repo.ListByBranch(r.Context(), branchID, from, to)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Lỗi hệ thống")
 		return
