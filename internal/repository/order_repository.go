@@ -185,6 +185,18 @@ func (r *OrderRepository) UpdateItemStatus(ctx context.Context, orderItemID, sta
 	return orderID, nil
 }
 
+func (r *OrderRepository) CountTablesOrdering(ctx context.Context, branchID string) (int, error) {
+	var count int
+	err := r.DB.QueryRow(ctx, `
+		SELECT COUNT(DISTINCT t.id)
+		FROM orders o
+		JOIN sessions s ON s.id = o.session_id
+		JOIN tables t ON t.id = s.table_id
+		WHERE t.branch_id = $1 AND o.status NOT IN ('served', 'cancelled') AND s.status != 'closed'
+	`, branchID).Scan(&count)
+	return count, err
+}
+
 func (r *OrderRepository) ListByBranch(ctx context.Context, branchID string) ([]models.Order, error) {
 	rows, err := r.DB.Query(ctx, `
 		SELECT o.id, t.code, t.area

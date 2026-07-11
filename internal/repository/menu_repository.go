@@ -146,16 +146,72 @@ func (r *MenuRepository) GetItemDetail(ctx context.Context, itemID string) (*mod
 
 // UpdateItem updates price and/or status and returns the item's branch id for realtime broadcast.
 func (r *MenuRepository) UpdateItem(ctx context.Context, id string, price, status *string) (string, error) {
+	return r.UpdateItemFull(ctx, id, UpdateItemInput{Price: price, Status: status})
+}
+
+type UpdateItemInput struct {
+	CategoryID      *string
+	Code            *string
+	Name            *string
+	Price           *string
+	Unit            *string
+	PrepTimeMinutes *int
+	Description     *string
+	Ingredients     *string
+	AllergyInfo     *string
+	IsPromo         *bool
+	IsBestSeller    *bool
+	IsNew           *bool
+	Status          *string
+}
+
+// UpdateItemFull updates any subset of an item's fields and returns the item's branch id for realtime broadcast.
+func (r *MenuRepository) UpdateItemFull(ctx context.Context, id string, in UpdateItemInput) (string, error) {
 	var setClauses []string
 	var args []any
 
-	if price != nil {
-		args = append(args, *price)
-		setClauses = append(setClauses, fmt.Sprintf("price = $%d", len(args)))
+	add := func(col string, val any) {
+		args = append(args, val)
+		setClauses = append(setClauses, fmt.Sprintf("%s = $%d", col, len(args)))
 	}
-	if status != nil {
-		args = append(args, *status)
-		setClauses = append(setClauses, fmt.Sprintf("status = $%d", len(args)))
+	if in.CategoryID != nil {
+		add("category_id", *in.CategoryID)
+	}
+	if in.Code != nil {
+		add("code", *in.Code)
+	}
+	if in.Name != nil {
+		add("name", *in.Name)
+	}
+	if in.Price != nil {
+		add("price", *in.Price)
+	}
+	if in.Unit != nil {
+		add("unit", *in.Unit)
+	}
+	if in.PrepTimeMinutes != nil {
+		add("prep_time_minutes", *in.PrepTimeMinutes)
+	}
+	if in.Description != nil {
+		add("description", *in.Description)
+	}
+	if in.Ingredients != nil {
+		add("ingredients", *in.Ingredients)
+	}
+	if in.AllergyInfo != nil {
+		add("allergy_info", *in.AllergyInfo)
+	}
+	if in.IsPromo != nil {
+		add("is_promo", *in.IsPromo)
+	}
+	if in.IsBestSeller != nil {
+		add("is_best_seller", *in.IsBestSeller)
+	}
+	if in.IsNew != nil {
+		add("is_new", *in.IsNew)
+	}
+	if in.Status != nil {
+		add("status", *in.Status)
 	}
 	if len(setClauses) == 0 {
 		return "", errors.New("no fields to update")
@@ -169,6 +225,10 @@ func (r *MenuRepository) UpdateItem(ctx context.Context, id string, price, statu
 		return "", ErrNotFound
 	}
 
+	return r.itemBranchID(ctx, id)
+}
+
+func (r *MenuRepository) itemBranchID(ctx context.Context, id string) (string, error) {
 	var branchID string
 	row := r.DB.QueryRow(ctx, `
 		SELECT c.branch_id FROM menu_items i JOIN menu_categories c ON c.id = i.category_id WHERE i.id = $1
@@ -177,4 +237,86 @@ func (r *MenuRepository) UpdateItem(ctx context.Context, id string, price, statu
 		return "", err
 	}
 	return branchID, nil
+}
+
+type CreateItemInput struct {
+	CategoryID      string
+	Code            string
+	Name            string
+	Price           string
+	Unit            string
+	PrepTimeMinutes int
+	Description     string
+	Ingredients     string
+	AllergyInfo     string
+	IsPromo         bool
+	IsBestSeller    bool
+	IsNew           bool
+	Status          string
+}
+
+// CreateItem inserts a new menu item and returns its id and branch id for realtime broadcast.
+func (r *MenuRepository) CreateItem(ctx context.Context, in CreateItemInput) (id string, branchID string, err error) {
+	status := in.Status
+	if status == "" {
+		status = "available"
+	}
+	row := r.DB.QueryRow(ctx, `
+		INSERT INTO menu_items (category_id, code, name, price, unit, prep_time_minutes, description, ingredients, allergy_info, is_promo, is_best_seller, is_new, status, image_key)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, '')
+		RETURNING id
+	`, in.CategoryID, in.Code, in.Name, in.Price, in.Unit, in.PrepTimeMinutes, in.Description, in.Ingredients, in.AllergyInfo, in.IsPromo, in.IsBestSeller, in.IsNew, status)
+	if err := row.Scan(&id); err != nil {
+		return "", "", err
+	}
+	branchID, err = r.itemBranchID(ctx, id)
+	return id, branchID, err
+}
+
+// DeleteItem removes a menu item and returns its branch id for realtime broadcast.
+func (r *MenuRepository) DeleteItem(ctx context.Context, id string) (string, error) {
+	branchID, err := r.itemBranchID(ctx, id)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return "", ErrNotFound
+		}
+		return "", err
+	}
+	if _, err := r.DB.Exec(ctx, `DELETE FROM menu_items WHERE id = $1`, id); err != nil {
+		return "", err
+	}
+	return branchID, nil
+}
+
+func (r *MenuRepository) ListCategories(ctx context.Context, branchID string) ([]models.MenuCategory, error) {
+	rows, err := r.DB.Query(ctx, `
+		SELECT id, branch_id, name, position FROM menu_categories WHERE branch_id = $1 ORDER BY position, name
+	`, branchID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var categories []models.MenuCategory
+	for rows.Next() {
+		var c models.MenuCategory
+		if err := rows.Scan(&c.ID, &c.BranchID, &c.Name, &c.Position); err != nil {
+			return nil, err
+		}
+		categories = append(categories, c)
+	}
+	return categories, rows.Err()
+}
+
+func (r *MenuRepository) CreateCategory(ctx context.Context, branchID, name string, position int) (*models.MenuCategory, error) {
+	row := r.DB.QueryRow(ctx, `
+		INSERT INTO menu_categories (branch_id, name, position)
+		VALUES ($1, $2, $3)
+		RETURNING id, branch_id, name, position
+	`, branchID, name, position)
+	var c models.MenuCategory
+	if err := row.Scan(&c.ID, &c.BranchID, &c.Name, &c.Position); err != nil {
+		return nil, err
+	}
+	return &c, nil
 }

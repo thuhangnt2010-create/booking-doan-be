@@ -42,6 +42,18 @@ func (r *PaymentRepository) Confirm(ctx context.Context, id string) (string, err
 	return sessionID, nil
 }
 
+func (r *PaymentRepository) CountTablesAwaitingPayment(ctx context.Context, branchID string) (int, error) {
+	var count int
+	err := r.DB.QueryRow(ctx, `
+		SELECT COUNT(DISTINCT t.id)
+		FROM payment_requests p
+		JOIN sessions s ON s.id = p.session_id
+		JOIN tables t ON t.id = s.table_id
+		WHERE t.branch_id = $1 AND p.status != 'cancelled' AND s.status != 'closed'
+	`, branchID).Scan(&count)
+	return count, err
+}
+
 func (r *PaymentRepository) ListByBranch(ctx context.Context, branchID string) ([]models.PaymentRequest, error) {
 	rows, err := r.DB.Query(ctx, `
 		SELECT p.id, p.session_id, p.status, p.requested_at, p.confirmed_at, t.code, t.area

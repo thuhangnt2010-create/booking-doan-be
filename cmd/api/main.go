@@ -75,7 +75,11 @@ func main() {
 	mux.HandleFunc("/menu-items/", menuHandler.Detail)
 	mux.Handle("/ws/menu/", &handlers.MenuWSHandler{Hub: hub})
 	mux.HandleFunc("/auth/login", authHandler.Login)
-	mux.HandleFunc("/admin/menu-items/", middleware.RequireAuth(authService, (&handlers.AdminMenuHandler{Repo: menuRepo, Hub: hub}).Update))
+	adminMenuHandler := &handlers.AdminMenuHandler{Repo: menuRepo, Hub: hub}
+	mux.HandleFunc("/admin/menu-items", middleware.RequireAuth(authService, adminMenuHandler.Create))
+	mux.HandleFunc("/admin/menu-items/", middleware.RequireAuth(authService, adminMenuHandler.ItemSubRoute))
+	adminCategoryHandler := &handlers.AdminCategoryHandler{Repo: menuRepo}
+	mux.HandleFunc("/admin/menu-categories", middleware.RequireAuth(authService, adminCategoryHandler.Root))
 	mux.HandleFunc("/orders", orderHandler.Root)
 	mux.HandleFunc("/orders/", orderHandler.SubRoute)
 	mux.HandleFunc("/order-items/", orderHandler.ItemSubRoute)
@@ -93,6 +97,8 @@ func main() {
 	mux.HandleFunc("/admin/tables", middleware.RequireAuth(authService, adminTableHandler.Root))
 	mux.HandleFunc("/admin/tables/", middleware.RequireAuth(authService, adminTableHandler.SubRoute))
 	mux.Handle("/admin/qr-images/", qrImageHandler)
+	adminSummaryHandler := &handlers.AdminSummaryHandler{OrderRepo: orderRepo, PaymentRepo: paymentRepo}
+	mux.HandleFunc("/admin/summary", middleware.RequireAuth(authService, adminSummaryHandler.Get))
 
 	log.Printf("booking-doan-be listening on :%s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, mux); err != nil {
