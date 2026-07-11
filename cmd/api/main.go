@@ -8,6 +8,7 @@ import (
 	"github.com/thuhangnt2010-create/booking-doan-be/internal/config"
 	"github.com/thuhangnt2010-create/booking-doan-be/internal/db"
 	"github.com/thuhangnt2010-create/booking-doan-be/internal/handlers"
+	"github.com/thuhangnt2010-create/booking-doan-be/internal/middleware"
 	"github.com/thuhangnt2010-create/booking-doan-be/internal/realtime"
 	"github.com/thuhangnt2010-create/booking-doan-be/internal/repository"
 	"github.com/thuhangnt2010-create/booking-doan-be/internal/service"
@@ -49,16 +50,19 @@ func main() {
 		Order:   orderRepo,
 		Hub:     hub,
 	}
-	orderHandler := &handlers.OrderHandler{Service: orderService, OrderRepo: orderRepo}
+	authService := &service.AuthService{Users: &repository.AdminUserRepository{DB: pgPool}, JWTSecret: cfg.JWTSecret}
+	authHandler := &handlers.AuthHandler{Service: authService}
+
+	orderHandler := &handlers.OrderHandler{Service: orderService, OrderRepo: orderRepo, Auth: authService}
 
 	staffCallRepo := &repository.StaffCallRepository{DB: pgPool}
 	staffCallService := &service.StaffCallService{Session: sessionRepo, Table: tableRepo, StaffCall: staffCallRepo, Hub: hub}
-	staffCallHandler := &handlers.StaffCallHandler{Service: staffCallService, Repo: staffCallRepo}
+	staffCallHandler := &handlers.StaffCallHandler{Service: staffCallService, Repo: staffCallRepo, Auth: authService}
 
 	paymentRepo := &repository.PaymentRepository{DB: pgPool}
 	paymentService := &service.PaymentService{Session: sessionRepo, Table: tableRepo, Order: orderRepo, Payment: paymentRepo, Hub: hub}
-	paymentHandler := &handlers.PaymentHandler{Service: paymentService, Repo: paymentRepo}
-	sessionExtraHandler := &handlers.SessionExtraHandler{Service: paymentService}
+	paymentHandler := &handlers.PaymentHandler{Service: paymentService, Repo: paymentRepo, Auth: authService}
+	sessionExtraHandler := &handlers.SessionExtraHandler{Service: paymentService, Auth: authService}
 
 	qrRepo := &repository.QRRepository{DB: pgPool}
 	adminTableHandler := &handlers.AdminTableHandler{TableRepo: tableRepo, QRRepo: qrRepo, PublicUserURL: cfg.PublicUserURL}
@@ -70,7 +74,8 @@ func main() {
 	mux.HandleFunc("/menu", menuHandler.List)
 	mux.HandleFunc("/menu-items/", menuHandler.Detail)
 	mux.Handle("/ws/menu/", &handlers.MenuWSHandler{Hub: hub})
-	mux.HandleFunc("/admin/menu-items/", (&handlers.AdminMenuHandler{Repo: menuRepo, Hub: hub}).Update)
+	mux.HandleFunc("/auth/login", authHandler.Login)
+	mux.HandleFunc("/admin/menu-items/", middleware.RequireAuth(authService, (&handlers.AdminMenuHandler{Repo: menuRepo, Hub: hub}).Update))
 	mux.HandleFunc("/orders", orderHandler.Root)
 	mux.HandleFunc("/orders/", orderHandler.SubRoute)
 	mux.HandleFunc("/order-items/", orderHandler.ItemSubRoute)
@@ -85,8 +90,8 @@ func main() {
 	mux.HandleFunc("/sessions/", sessionExtraHandler.SubRoute)
 	mux.Handle("/ws/payments/branch/", &handlers.PaymentBranchWSHandler{Hub: hub})
 	mux.Handle("/ws/payments/session/", &handlers.PaymentSessionWSHandler{Hub: hub})
-	mux.HandleFunc("/admin/tables", adminTableHandler.Root)
-	mux.HandleFunc("/admin/tables/", adminTableHandler.SubRoute)
+	mux.HandleFunc("/admin/tables", middleware.RequireAuth(authService, adminTableHandler.Root))
+	mux.HandleFunc("/admin/tables/", middleware.RequireAuth(authService, adminTableHandler.SubRoute))
 	mux.Handle("/admin/qr-images/", qrImageHandler)
 
 	log.Printf("booking-doan-be listening on :%s", cfg.Port)

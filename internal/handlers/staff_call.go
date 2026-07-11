@@ -14,6 +14,7 @@ import (
 type StaffCallHandler struct {
 	Service *service.StaffCallService
 	Repo    *repository.StaffCallRepository
+	Auth    *service.AuthService
 }
 
 type createStaffCallBody struct {
@@ -69,6 +70,9 @@ func (h *StaffCallHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "MISSING_QUERY", "Thiếu branchId hoặc sessionId")
 		return
 	}
+	if branchID != "" && !requireAuthInline(w, r, h.Auth) {
+		return
+	}
 
 	var calls []models.StaffCallRequest
 	var err error
@@ -91,6 +95,9 @@ func (h *StaffCallHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *StaffCallHandler) SubRoute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPatch || !strings.HasSuffix(r.URL.Path, "/status") {
 		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if !requireAuthInline(w, r, h.Auth) {
 		return
 	}
 	id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/staff-calls/"), "/status")

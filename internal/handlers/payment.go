@@ -14,6 +14,7 @@ import (
 type PaymentHandler struct {
 	Service *service.PaymentService
 	Repo    *repository.PaymentRepository
+	Auth    *service.AuthService
 }
 
 type createPaymentRequestBody struct {
@@ -32,6 +33,9 @@ func (h *PaymentHandler) Root(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PaymentHandler) List(w http.ResponseWriter, r *http.Request) {
+	if !requireAuthInline(w, r, h.Auth) {
+		return
+	}
 	branchID := r.URL.Query().Get("branchId")
 	if branchID == "" {
 		writeError(w, http.StatusBadRequest, "MISSING_BRANCH_ID", "Thiếu branchId")
@@ -81,6 +85,9 @@ func (h *PaymentHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *PaymentHandler) SubRoute(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPatch || !strings.HasSuffix(r.URL.Path, "/confirm") {
 		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if !requireAuthInline(w, r, h.Auth) {
 		return
 	}
 	id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/payment-requests/"), "/confirm")

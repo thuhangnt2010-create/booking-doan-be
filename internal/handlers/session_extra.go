@@ -11,6 +11,7 @@ import (
 
 type SessionExtraHandler struct {
 	Service *service.PaymentService
+	Auth    *service.AuthService
 }
 
 func (h *SessionExtraHandler) SubRoute(w http.ResponseWriter, r *http.Request) {
@@ -42,6 +43,9 @@ func (h *SessionExtraHandler) Bill(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SessionExtraHandler) Close(w http.ResponseWriter, r *http.Request) {
+	if !requireAuthInline(w, r, h.Auth) {
+		return
+	}
 	id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/sessions/"), "/close")
 	if id == "" {
 		writeError(w, http.StatusBadRequest, "INVALID_ID", "Thiếu session id")

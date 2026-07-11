@@ -14,6 +14,7 @@ import (
 type OrderHandler struct {
 	Service   *service.OrderService
 	OrderRepo *repository.OrderRepository
+	Auth      *service.AuthService
 }
 
 type createOrderItemBody struct {
@@ -78,6 +79,9 @@ func (h *OrderHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "MISSING_QUERY", "Thiếu branchId hoặc sessionId")
 		return
 	}
+	if branchID != "" && !requireAuthInline(w, r, h.Auth) {
+		return
+	}
 
 	var orders []models.Order
 	var err error
@@ -103,6 +107,9 @@ type updateStatusBody struct {
 }
 
 func (h *OrderHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
+	if !requireAuthInline(w, r, h.Auth) {
+		return
+	}
 	id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/orders/"), "/status")
 	if id == "" {
 		writeError(w, http.StatusBadRequest, "INVALID_ID", "Thiếu id order")
@@ -123,6 +130,9 @@ func (h *OrderHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *OrderHandler) UpdateItemStatus(w http.ResponseWriter, r *http.Request) {
+	if !requireAuthInline(w, r, h.Auth) {
+		return
+	}
 	id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/order-items/"), "/status")
 	if id == "" {
 		writeError(w, http.StatusBadRequest, "INVALID_ID", "Thiếu id món trong order")
