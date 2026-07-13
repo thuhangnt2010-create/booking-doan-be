@@ -153,6 +153,17 @@ func (s *OrderService) UpdateOrderStatus(ctx context.Context, orderID, status st
 	if !validStatuses[status] {
 		return &OrderValidationError{Code: "INVALID_STATUS", Message: "Trạng thái không hợp lệ"}
 	}
+	if status == "cancelled" {
+		order, err := s.Order.GetByID(ctx, orderID)
+		if err != nil {
+			return err
+		}
+		for _, it := range order.Items {
+			if it.Status == "served" {
+				return &OrderValidationError{Code: "ORDER_HAS_SERVED_ITEMS", Message: "Không thể hủy order đã có món giao cho khách"}
+			}
+		}
+	}
 	sessionID, err := s.Order.UpdateStatus(ctx, orderID, status)
 	if err != nil {
 		return err
