@@ -180,7 +180,7 @@ func (h *BackupHandler) RcloneStatus(w http.ResponseWriter, r *http.Request) {
 	if lines := strings.SplitN(string(versionOut), "\n", 2); len(lines) > 0 {
 		version = strings.TrimSpace(lines[0])
 	}
-	remotesOut, _ := exec.CommandContext(r.Context(), "rclone", "listremotes").CombinedOutput()
+	remotesOut, _ := exec.CommandContext(r.Context(), "rclone", "listremotes").Output()
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
