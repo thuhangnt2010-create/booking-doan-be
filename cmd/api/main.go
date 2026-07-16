@@ -124,6 +124,7 @@ func main() {
 		Backup:       backupService,
 		OAuth:        backupOAuthService,
 		RedirectBase: cfg.PublicUserURL + "/api",
+		MinioBuckets: minioBuckets,
 	}
 	mux.HandleFunc("/admin/backup/settings", middleware.RequireAuth(authService, backupHandler.Settings))
 	mux.HandleFunc("/admin/backup/run", middleware.RequireAuth(authService, backupHandler.RunNow))

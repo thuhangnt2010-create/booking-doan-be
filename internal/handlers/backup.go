@@ -23,6 +23,9 @@ type BackupHandler struct {
 	// RedirectBase is the public API base URL (e.g. http://<host>/api) used to
 	// build the OAuth callback URL registered in Google Cloud Console.
 	RedirectBase string
+	// MinioBuckets is the server-configured bucket list (env MINIO_BUCKETS),
+	// surfaced read-only so the FE can show what "uploads" scope actually covers.
+	MinioBuckets []string
 }
 
 // requireBackupAdmin restricts backup config/trigger to the "admin" role —
@@ -47,8 +50,15 @@ func (h *BackupHandler) Settings(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "Lỗi hệ thống")
 			return
 		}
+		buckets := h.MinioBuckets
+		if buckets == nil {
+			buckets = []string{}
+		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(s)
+		json.NewEncoder(w).Encode(map[string]any{
+			"settings":               s,
+			"minioBucketsConfigured": buckets,
+		})
 	case http.MethodPut:
 		var body models.BackupSettings
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
