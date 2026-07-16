@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/thuhangnt2010-create/booking-doan-be/internal/config"
 	"github.com/thuhangnt2010-create/booking-doan-be/internal/db"
@@ -99,6 +100,40 @@ func main() {
 	mux.Handle("/admin/qr-images/", qrImageHandler)
 	adminSummaryHandler := &handlers.AdminSummaryHandler{OrderRepo: orderRepo, PaymentRepo: paymentRepo}
 	mux.HandleFunc("/admin/summary", middleware.RequireAuth(authService, adminSummaryHandler.Get))
+
+	backupRepo := &repository.BackupRepository{DB: pgPool}
+	var minioBuckets []string
+	if cfg.MinioBuckets != "" {
+		minioBuckets = strings.Split(cfg.MinioBuckets, ",")
+	}
+	backupService := &service.BackupService{
+		Repo:         backupRepo,
+		DatabaseURL:  cfg.DatabaseURL,
+		MinioAddr:    cfg.MinioAddr,
+		MinioUser:    cfg.MinioUser,
+		MinioPass:    cfg.MinioPassword,
+		MinioBuckets: minioBuckets,
+	}
+	backupOAuthService := &service.BackupOAuthService{Redis: redisClient, Repo: backupRepo}
+	backupScheduler := &service.BackupScheduler{Repo: backupRepo, Backup: backupService}
+	stopBackupScheduler := backupScheduler.Start(ctx)
+	defer stopBackupScheduler()
+
+	backupHandler := &handlers.BackupHandler{
+		Repo:         backupRepo,
+		Backup:       backupService,
+		OAuth:        backupOAuthService,
+		RedirectBase: cfg.PublicUserURL + "/api",
+	}
+	mux.HandleFunc("/admin/backup/settings", middleware.RequireAuth(authService, backupHandler.Settings))
+	mux.HandleFunc("/admin/backup/run", middleware.RequireAuth(authService, backupHandler.RunNow))
+	mux.HandleFunc("/admin/backup/runs", middleware.RequireAuth(authService, backupHandler.ListRuns))
+	mux.HandleFunc("/admin/backup/runs/", middleware.RequireAuth(authService, backupHandler.RunSubRoute))
+	mux.HandleFunc("/admin/backup/rclone-status", middleware.RequireAuth(authService, backupHandler.RcloneStatus))
+	mux.HandleFunc("/admin/backup/gdrive/creds", middleware.RequireAuth(authService, backupHandler.GdriveCreds))
+	mux.HandleFunc("/admin/backup/gdrive/oauth/start", middleware.RequireAuth(authService, backupHandler.OAuthStart))
+	mux.HandleFunc("/admin/backup/gdrive/disconnect", middleware.RequireAuth(authService, backupHandler.Disconnect))
+	mux.HandleFunc("/public/backup/oauth/callback", backupHandler.OAuthCallback)
 
 	log.Printf("booking-doan-be listening on :%s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, mux); err != nil {
